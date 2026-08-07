@@ -44,9 +44,10 @@ function snippetHash(string $format, string $snippetLeft, ?string $snippetRight 
         $str .= "_{$snippetRight}";
     }
 
-    $crc = rtrim(strtr(base64_encode(crc64($str)), '+/', '-_'), '=');
+    // Truncated SHA-256 (collision-resistant); 8 bytes keeps share URLs short.
+    $hash = substr(hash('sha256', $str, true), 0, 8);
 
-    return $crc;
+    return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
 }
 
 function saveSnippet(string $format, string $snippetLeft, ?string $snippetRight = null, ?string $title = null): ?array
@@ -94,44 +95,6 @@ function htmlSafeSnippet(?string $snippet): string
     }
 
     return (string) $snippet;
-}
-
-function crc64Table(): array
-{
-    $crc64tab = [];
-
-    $poly64rev = (0xC96C5795 << 32) | 0xD7870F42;
-
-    for ($i = 0; $i < 256; $i++) {
-        for ($part = $i, $bit = 0; $bit < 8; $bit++) {
-            if ($part & 1) {
-                $part = (($part >> 1) & ~(0x8 << 60)) ^ $poly64rev;
-            } else {
-                $part = ($part >> 1) & ~(0x8 << 60);
-            }
-        }
-
-        $crc64tab[$i] = $part;
-    }
-
-    return $crc64tab;
-}
-
-function crc64(string $string, string $format = '%x'): string
-{
-    static $crc64tab;
-
-    if ($crc64tab === null) {
-        $crc64tab = crc64Table();
-    }
-
-    $crc = 0;
-
-    for ($i = 0; $i < strlen($string); $i++) {
-        $crc = $crc64tab[($crc ^ ord($string[$i])) & 0xff] ^ (($crc >> 8) & ~(0xff << 56));
-    }
-
-    return sprintf($format, $crc);
 }
 
 function response(array $data): void
