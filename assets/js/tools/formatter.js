@@ -101,7 +101,8 @@ $('#function-share').on('click', function () {
             for (const cm of cms) {
                 cm.doc.markClean();
             }
-            showToast('<i class="bi bi-hand-thumbs-up-fill"></i> Copy & paste current URL to share snippet', 'bg-success');
+            navigator.clipboard.writeText(window.location.href);
+            showToast('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
             st.attr('readonly', true);
             setTitle(st.val());
         },
