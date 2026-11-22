@@ -1,105 +1,119 @@
 <?php
 
 /**
- * Integration test for the secrets feature. Run inside the app container:
- *
- *   docker compose exec tools php tests/secrets_test.php
- *
- * Requires the database to be up (uses the same MYSQL_* env vars as the app).
- * Exercises saveSecret / consumeSecret / fetchSecret end-to-end, including
- * burn-after-read and expiry behaviour. Cleans up all rows it creates.
+ * Integration tests for the secrets feature (lib + endpoints).
+ * Requires the MySQL container. Cleans up all rows it creates.
  */
 
-if (php_sapi_name() !== 'cli') {
-    exit('CLI only');
-}
+require(__DIR__ . '/bootstrap.php');
 
+$_SERVER['SERVER_NAME'] = 'test.local';
 require(__DIR__ . '/../config.php');
 require(__DIR__ . '/../lib.php');
 
-$failures = 0;
+echo "== secrets: lib integration ==\n";
 
-function check(string $name, bool $condition): void
-{
-    global $failures;
-    if ($condition) {
-        echo "PASS  $name\n";
-    } else {
-        echo "FAIL  $name\n";
-        $failures++;
-    }
-}
-
-function cleanup(string $hash): void
-{
-    deleteSecret($hash);
-}
-
-// --- saveSecret + fetchSecret ------------------------------------------------
+// --- saveSecret + fetchSecret -------------------------------------------------------
 
 $ciphertext = base64_encode(random_bytes(64));
-$hash = null;
 
 $secret = saveSecret($ciphertext, 3600, 1);
 check('saveSecret returns a row', is_array($secret));
 $hash = $secret['hash'] ?? '';
-check('hash is non-empty', $hash !== '');
-check('ciphertext round-trips', ($secret['ciphertext'] ?? null) === $ciphertext);
-check('max_reads stored', (int) ($secret['max_reads'] ?? 0) === 1);
-check('reads starts at 0', (int) ($secret['reads'] ?? -1) === 0);
-check('expires_at is set', !empty($secret['expires_at']));
+check('hash non-empty', $hash !== '');
+eq('ciphertext round-trips', $ciphertext, $secret['ciphertext'] ?? null);
+eq('max_reads stored', 1, (int) ($secret['max_reads'] ?? 0));
+eq('reads starts at 0', 0, (int) ($secret['reads'] ?? -1));
+check('expires_at set', !empty($secret['expires_at']));
 
-// Deduplication: same ciphertext -> same hash, no duplicate insert.
 $again = saveSecret($ciphertext, 3600, 1);
-check('duplicate ciphertext returns same hash', ($again['hash'] ?? '') === $hash);
+eq('duplicate ciphertext -> same hash', $hash, $again['hash'] ?? '');
 
-// --- consumeSecret: burn after 1 read -----------------------------------------
+// --- single-read burn ------------------------------------------------------------------
 
-$read1 = consumeSecret($hash);
-check('first read returns ciphertext', $read1 === $ciphertext);
+eq('first read returns ciphertext', $ciphertext, consumeSecret($hash));
+check('burned secret deleted', fetchSecret($hash) === null);
+check('second read null', consumeSecret($hash) === null);
 
-// max_reads=1 -> row is deleted immediately after the single allowed read.
-check('burned secret is deleted', fetchSecret($hash) === null);
-
-$read2 = consumeSecret($hash);
-check('second read returns null (gone)', $read2 === null);
-
-// --- multi-read secret ---------------------------------------------------------
+// --- multi-read burn ---------------------------------------------------------------------
 
 $hash3 = (saveSecret(base64_encode(random_bytes(32)), 3600, 3))['hash'];
-check('read 1 of 3 ok', consumeSecret($hash3) !== null);
-check('read 2 of 3 ok', consumeSecret($hash3) !== null);
-check('read 3 of 3 ok', consumeSecret($hash3) !== null);
-check('read 4 of 3 burned', consumeSecret($hash3) === null);
-check('row gone after burn', fetchSecret($hash3) === null);
+check('read 1 of 3', consumeSecret($hash3) !== null);
+check('read 2 of 3', consumeSecret($hash3) !== null);
+check('read 3 of 3', consumeSecret($hash3) !== null);
+check('read 4 burned', consumeSecret($hash3) === null);
+check('row gone', fetchSecret($hash3) === null);
 
-// --- expiry ---------------------------------------------------------------------
+// --- expiry -------------------------------------------------------------------------------
 
 $hash4 = (saveSecret(base64_encode(random_bytes(32)), 1, 5))['hash'];
-// Force expiry by backdating.
 mysql()->query("UPDATE secrets SET expires_at = UTC_TIMESTAMP() - INTERVAL 1 SECOND WHERE hash = '" . mysql()->real_escape_string($hash4) . "'");
-check('expired secret reads as null', consumeSecret($hash4) === null);
-check('expired row is deleted', fetchSecret($hash4) === null);
+check('expired reads null', consumeSecret($hash4) === null);
+check('expired row deleted', fetchSecret($hash4) === null);
 
-// --- unknown hash -----------------------------------------------------------------
+// --- unknown hash ----------------------------------------------------------------------------
 
-check('unknown hash returns null', consumeSecret('doesnotexist') === null);
+check('unknown hash null', consumeSecret('doesnotexist') === null);
 
-// --- defaults when ttl / max_reads are null ---------------------------------------
+// --- null defaults ----------------------------------------------------------------------------
 
-$secret5 = saveSecret(base64_encode(random_bytes(32)), null, null);
-check('null ttl defaults to 4h expiry', !empty($secret5['expires_at']));
-check('null max_reads defaults to 1', (int) $secret5['max_reads'] === 1);
-cleanup($secret5['hash']);
+$s5 = saveSecret(base64_encode(random_bytes(32)), null, null);
+check('null ttl -> expiry set', !empty($s5['expires_at']));
+eq('null max_reads -> 1', 1, (int) $s5['max_reads']);
+deleteSecret($s5['hash']);
 
-// --- sweepExpiredSecrets -----------------------------------------------------------
+// --- sweep --------------------------------------------------------------------------------------
 
 $hash6 = (saveSecret(base64_encode(random_bytes(32)), 3600, 5))['hash'];
 mysql()->query("UPDATE secrets SET expires_at = UTC_TIMESTAMP() - INTERVAL 1 SECOND WHERE hash = '" . mysql()->real_escape_string($hash6) . "'");
 sweepExpiredSecrets();
-check('sweep removes expired rows', fetchSecret($hash6) === null);
+check('sweep removes expired', fetchSecret($hash6) === null);
 
-// ---------------------------------------------------------------------------
+// --- large ciphertext ----------------------------------------------------------------------------
 
-echo "\n" . ($failures === 0 ? 'ALL TESTS PASSED' : "$failures TEST(S) FAILED") . "\n";
-exit($failures === 0 ? 0 : 1);
+$big = base64_encode(random_bytes(60000)); // ~80KB base64 — under the 64KB POST cap? No: 80000 chars. Use 40k bytes.
+$big = base64_encode(random_bytes(40000));
+$bigSecret = saveSecret($big, 3600, 1);
+check('large ciphertext saves', is_array($bigSecret));
+eq('large ciphertext round-trips', $big, consumeSecret($bigSecret['hash']));
+
+echo "\n== secrets: HTTP endpoints ==\n";
+
+// --- secret_save.php ------------------------------------------------------------------------------
+
+$r = http_subprocess('secret_save.php', ['ciphertext' => base64_encode('e2e-test-payload'), 'ttl' => '14400', 'max_reads' => '1']);
+check('save returns hash', !empty($r['json']['hash']));
+eq('save status 200', 200, $r['status']);
+$httpHash = $r['json']['hash'];
+
+$r = http_subprocess('secret_save.php', []);
+eq('save empty rejected status', 400, $r['status']);
+check('save empty rejected body', !empty($r['json']['error']));
+
+$r = http_subprocess('secret_save.php', ['ciphertext' => '!!!not-base64!!!']);
+eq('save invalid b64 rejected', 400, $r['status']);
+
+$r = http_subprocess('secret_save.php', ['ciphertext' => str_repeat('A', 70000)]);
+eq('save oversized rejected', 400, $r['status']);
+
+// --- secret_read.php --------------------------------------------------------------------------------
+
+$r = http_subprocess('secret_read.php', ['hash' => $httpHash]);
+eq('read status 200', 200, $r['status']);
+eq('read returns ciphertext', base64_encode('e2e-test-payload'), $r['json']['ciphertext'] ?? '');
+
+$r = http_subprocess('secret_read.php', ['hash' => $httpHash]);
+eq('second read 410', 410, $r['status']);
+check('second read error msg', !empty($r['json']['error']));
+
+$r = http_subprocess('secret_read.php', ['hash' => 'neverexisted']);
+eq('unknown hash 410', 410, $r['status']);
+
+$r = http_subprocess('secret_read.php', ['hash' => '"><script>alert(1)</script>']);
+eq('injection hash 400', 400, $r['status']);
+
+$r = http_subprocess('secret_read.php', []);
+eq('empty hash 400', 400, $r['status']);
+
+test_summary('secrets');
+exit($GLOBALS['failures'] === 0 ? 0 : 1);
