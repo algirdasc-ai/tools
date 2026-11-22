@@ -126,12 +126,13 @@ function saveSecret(string $ciphertext, ?int $ttlSeconds, ?int $maxReads): ?arra
         return $existing;
     }
 
-    $expiresAt = $ttlSeconds !== null ? gmdate('Y-m-d H:i:s', time() + $ttlSeconds) : null;
+    // mysqli cannot bind nulls into NOT NULL columns, and `reads` has no
+    // default in the schema - provide explicit values instead.
+    $expiresAt = gmdate('Y-m-d H:i:s', time() + ($ttlSeconds ?? 4 * 3600));
+    $maxReads = $maxReads ?? 1;
 
-    // INSERT ... SELECT tricks mysqli into binding NULLs: NULLIF falls back to
-    // the column default for ttl=0/max_reads=0, which we never send anyway.
-    $stmt = mysql()->prepare('INSERT IGNORE INTO secrets (hash, ciphertext, expires_at, max_reads, `reads`, created_at) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, 0), 0, NULL)');
-    $stmt->bind_param('sssi', $hash, $ciphertext, $expiresAt ?? '', $maxReads ?? 0);
+    $stmt = mysql()->prepare('INSERT IGNORE INTO secrets (hash, ciphertext, expires_at, max_reads, `reads`, created_at) VALUES (?, ?, ?, ?, 0, NULL)');
+    $stmt->bind_param('sssi', $hash, $ciphertext, $expiresAt, $maxReads);
     $stmt->execute();
     $stmt->close();
 
