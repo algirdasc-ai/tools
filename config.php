@@ -3,7 +3,7 @@
 $title = getenv('APP_TITLE') . ' Tools';
 
 $appBaseUrl = rtrim((string) getenv('APP_BASE_URL'), '/');
-$base_url = $appBaseUrl ?: "https://{$_SERVER['SERVER_NAME']}";
+$base_url = $appBaseUrl ?: 'https://' . ($_SERVER['SERVER_NAME'] ?? 'localhost');
 $current_url = $base_url . ($_SERVER['REQUEST_URI'] ?? '/');
 
 $tools = [
