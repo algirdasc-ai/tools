@@ -23,5 +23,5 @@
     </select>
 </div>
 <script>
-    const activeSnippetFormat = <?= $activeSnippet ? "'{$activeSnippet['format']}'" : 'null' ?>;
+    const activeSnippetFormat = <?= json_encode($activeSnippet['format'] ?? null) ?>;
 </script>

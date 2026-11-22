@@ -2,6 +2,9 @@
 
 $mysqli = null;
 
+// Cap decompressed output to guard against compression bombs.
+const MAX_DECOMPRESS_BYTES = 8 * 1024 * 1024; // 8 MB
+
 function mysql(): mysqli
 {
     global $mysqli;
@@ -68,6 +71,10 @@ function saveSnippet(string $format, string $snippetLeft, ?string $snippetRight 
     if ($snippet) {
         return $snippet;
     }
+
+    // Column lengths match sql/snippets.sql: hash varchar(32), title varchar(255).
+    $hash = mb_substr($hash, 0, 32);
+    $title = $title !== null ? mb_substr($title, 0, 255) : null;
 
     $stmt = mysql()->prepare('INSERT IGNORE INTO snippets VALUES (?, ?, ?, ?, ?, NULL)');
     $stmt->bind_param('sssss', $hash, $title, $dbSafeSnippetLeft, $dbSafeSnippetRight, $format);

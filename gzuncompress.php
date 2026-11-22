@@ -13,14 +13,20 @@ if (!$base64) {
     error('Invalid request');
 }
 
-$data = @gzuncompress(hex2bin(str_replace('0x', '', $base64)));
+$binary = base64_decode($base64, true);
 
-if (!$data) {
-    $data = @gzuncompress(base64_decode($base64));
+// Hex path: only attempt if input is valid, even-length hex (avoids hex2bin warnings).
+$hex = str_replace('0x', '', $base64);
+$hexBinary = (ctype_xdigit($hex) && strlen($hex) % 2 === 0) ? hex2bin($hex) : false;
+
+$data = $binary !== false ? @gzuncompress($binary, MAX_DECOMPRESS_BYTES) : false;
+
+if (!$data && $hexBinary !== false) {
+    $data = @gzuncompress($hexBinary, MAX_DECOMPRESS_BYTES);
 }
 
 if (!$data) {
-    error('Failed to uncomporess given string');
+    error('Failed to uncompress given string');
 }
 
 $format = 'text';

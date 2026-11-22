@@ -2,6 +2,15 @@
 require('config.php');
 require('lib.php');
 
+// Security headers: deny framing, prevent MIME sniffing, lock down CSP.
+// Snippet content is double-escaped before output (htmlentities), so
+// script-src 'self' blocks any residual injection; unpkg.com is required
+// for the jsonlint addon.
+header("Content-Security-Policy: default-src 'self'; script-src 'self' https://unpkg.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
 $activeTool = $tools[$_GET['tool'] ?? 'f'] ?? $tools['f'];
 $activeSnippet = getSnippet($_GET['hash'] ?? '');
 ?>

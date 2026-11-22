@@ -4,13 +4,13 @@ START TRANSACTION;
 SET time_zone = "+00:00";
 
 CREATE TABLE `snippets` (
-  `hash` varchar(32) COLLATE utf8_bin NOT NULL,
-  `title` varchar(255) COLLATE utf8_bin DEFAULT NULL,
-  `snippetLeft` mediumtext COLLATE utf8_bin NOT NULL,
-  `snippetRight` mediumtext COLLATE utf8_bin DEFAULT NULL,
-  `format` varchar(255) COLLATE utf8_bin NOT NULL,
+  `hash` varchar(32) COLLATE utf8mb4_bin NOT NULL,
+  `title` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `snippetLeft` mediumtext COLLATE utf8mb4_bin NOT NULL,
+  `snippetRight` mediumtext COLLATE utf8mb4_bin DEFAULT NULL,
+  `format` varchar(255) COLLATE utf8mb4_bin NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 ALTER TABLE `snippets`
   ADD PRIMARY KEY (`hash`);

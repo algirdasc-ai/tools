@@ -8,7 +8,7 @@ function indent_xml($snippet): string
 		$doc = new DOMDocument('1.0');
 		$doc->preserveWhiteSpace = false;
 		$doc->formatOutput = true;
-		$doc->loadXML($snippet);
+		$doc->loadXML($snippet, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
 		$snippet = $doc->saveXML();
 	} catch (Exception $ex) {
 	}

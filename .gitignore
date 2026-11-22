@@ -1,2 +1,4 @@
 cache/
 secrets.php
+.env
+data/
