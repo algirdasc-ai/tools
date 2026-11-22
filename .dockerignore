@@ -5,7 +5,7 @@
 !.env.example
 data/
 cache/
-secrets.php
+/secrets.php
 *.md
 .dockerignore
 Dockerfile
