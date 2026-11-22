@@ -12,7 +12,8 @@ header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
 $activeTool = $tools[$_GET['tool'] ?? 'f'] ?? $tools['f'];
-$activeSnippet = getSnippet($_GET['hash'] ?? '');
+// Secret hashes live in the secrets table - don't waste a snippets query.
+$activeSnippet = $activeTool !== 'secrets' ? getSnippet($_GET['hash'] ?? '') : null;
 ?>
 
 <!doctype html>

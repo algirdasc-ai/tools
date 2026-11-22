@@ -48,9 +48,15 @@ $('#function-create-secret').on('click', async function () {
 
         const rawKey = await crypto.subtle.exportKey('raw', key);
 
+        let payloadB64 = '';
+        for (let i = 0; i < payload.length; i += 8192) {
+            payloadB64 += String.fromCharCode.apply(null, payload.subarray(i, i + 8192));
+        }
+        payloadB64 = btoa(payloadB64);
+
         ajax('/secret_save.php',
             {
-                ciphertext: btoa(String.fromCharCode(...payload)),
+                ciphertext: payloadB64,
                 ttl: $('#secret-ttl').val(),
                 max_reads: $('#secret-max-reads').val(),
             },
@@ -94,6 +100,12 @@ if (typeof activeSecretHash === 'string' && activeSecretHash) {
             return;
         }
 
+        if (!window.isSecureContext || !crypto.subtle) {
+            $('#secret-burn-notice').addClass('d-none');
+            secretStatus('Web Crypto API is unavailable — this page must be served over HTTPS (or localhost) for decryption to work.', 'alert-danger');
+            return;
+        }
+
         let key;
         try {
             key = await crypto.subtle.importKey('raw', b64urlDecode(fragment), { name: 'AES-GCM' }, false, ['decrypt']);
@@ -127,7 +139,11 @@ if (typeof activeSecretHash === 'string' && activeSecretHash) {
                 let message = 'Failed to load the secret.';
                 try {
                     message = JSON.parse(xhr.responseText).error || message;
-                } catch (e) {}
+                } catch (e) {
+                    if (xhr.responseText) {
+                        message = 'Server error: ' + xhr.responseText.substring(0, 200);
+                    }
+                }
                 secretStatus(message, 'alert-danger');
             }
         );
