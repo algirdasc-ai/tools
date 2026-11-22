@@ -86,6 +86,13 @@ eq('uncompress bomb rejected', 400, $r['status']);
 $r = http_subprocess('gzuncompress.php', ['base64' => 'abc']);
 check('odd hex no warning leak', strpos($r['raw'], 'Warning') === false && strpos($r['raw'], 'Fatal') === false);
 
+// Error responses must never leak stack traces or file paths (toast leak fix).
+foreach (['gzinflate.php', 'gzuncompress.php'] as $ep) {
+    $r = http_subprocess($ep, ['base64' => 'totally-invalid!!!']);
+    check("$ep error has no stack trace", strpos($r['raw'], 'Stack trace') === false && strpos($r['raw'], '/var/www') === false);
+    check("$ep error is clean json", !empty($r['json']['error']));
+}
+
 echo "\n== autoformat.php ==\n";
 
 // --- json indent (self-contained, no external service) --------------------------------------------------

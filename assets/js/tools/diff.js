@@ -65,7 +65,7 @@ $('#function-share').on('click', function () {
                 cm.doc.markClean();
             }
             navigator.clipboard.writeText(window.location.href);
-            showToast('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
+            showToastHtml('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
         },
         handleAjaxError,
         function () {
