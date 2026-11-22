@@ -102,7 +102,7 @@ $('#function-share').on('click', function () {
                 cm.doc.markClean();
             }
             navigator.clipboard.writeText(window.location.href);
-            showToast('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
+            showToastHtml('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
             st.attr('readonly', true);
             setTitle(st.val());
         },
@@ -123,7 +123,7 @@ $('#function-diff').on('click', function () {
     if (params[1]) {
         window.location.href = '/' + params.join('/');    
     } else {
-        showToast('<i class="bi bi-share"></i> Share snippet first');
+        showToastHtml('<i class="bi bi-share"></i> Share snippet first');
     }
 });
 

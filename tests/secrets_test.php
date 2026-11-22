@@ -115,5 +115,10 @@ eq('injection hash 400', 400, $r['status']);
 $r = http_subprocess('secret_read.php', []);
 eq('empty hash 400', 400, $r['status']);
 
+// Error bodies must never leak internals (they are shown in the UI toast).
+$r = http_subprocess('secret_read.php', ['hash' => 'neverexisted']);
+check('gone body has no internals', strpos($r['raw'], 'Stack trace') === false && strpos($r['raw'], '/var/www') === false);
+check('gone body is generic', strpos($r['json']['error'] ?? '', 'gone') !== false);
+
 test_summary('secrets');
 exit($GLOBALS['failures'] === 0 ? 0 : 1);

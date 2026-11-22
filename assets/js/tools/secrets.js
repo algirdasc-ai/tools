@@ -64,7 +64,7 @@ $('#function-create-secret').on('click', async function () {
                 const link = window.location.origin + '/s/' + response.hash + '#' + b64urlEncode(rawKey);
                 $('#secret-link').val(link);
                 $('#function-copy-secret').removeAttr('disabled');
-                showToast('<i class="bi bi-shield-lock"></i> Secret encrypted. Share the link — it burns after reading.', 'bg-success');
+                showToastHtml('<i class="bi bi-shield-lock"></i> Secret encrypted. Share the link — it burns after reading.', 'bg-success');
                 setButtonReady(btn);
             },
             handleAjaxError,
@@ -82,7 +82,7 @@ $('#function-copy-secret').on('click', function () {
     const link = $('#secret-link').val();
     if (link) {
         navigator.clipboard.writeText(link);
-        showToast('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
+        showToastHtml('<i class="bi bi-hand-thumbs-up-fill"></i> URL copied to clipboard', 'bg-success');
     }
 });
 
@@ -152,5 +152,5 @@ if (typeof activeSecretHash === 'string' && activeSecretHash) {
 
 $('#function-copy-revealed').on('click', function () {
     navigator.clipboard.writeText($('#secret-output').text());
-    showToast('<i class="bi bi-hand-thumbs-up-fill"></i> Secret copied to clipboard', 'bg-success');
+    showToastHtml('<i class="bi bi-hand-thumbs-up-fill"></i> Secret copied to clipboard', 'bg-success');
 });

@@ -79,8 +79,35 @@ function ajax(url, data, onSuccess, onError, onComplete)
 
 function handleAjaxError(xhr, errorType, error)
 {
-    showToast(xhr.responseText, 'bg-danger');
+    // Never echo raw responseText into the DOM: it can contain server-side
+    // stack traces or reflected user input. Show a generic message; details
+    // belong in the console.
+    console.error('AJAX error', xhr.status, errorType, error);
+    let message = 'Request failed';
+    try {
+        const parsed = JSON.parse(xhr.responseText);
+        if (parsed && parsed.error) {
+            message = parsed.error; // server-controlled, escaped below
+        }
+    } catch (e) {}
+    showToast(message, 'bg-danger');
 }
+
+// Variant for trusted, hardcoded markup (icons). Never pass server/user data.
+const showToastHtml = function(content, bgclass, timeout)
+{
+    if (!timeout) {
+        timeout = 5000;
+    }
+    if (!bgclass) {
+        bgclass = 'bg-primary';
+    }
+    toast.find('#toast-body').html(content);
+    toast.addClass(bgclass).addClass('show');
+    setTimeout(function () {
+        toast.removeClass('show').removeClass(bgclass);
+    }, timeout);
+};
 
 const toastTimeout = null;
 const showToast = function(content, bgclass, timeout)
@@ -93,7 +120,9 @@ const showToast = function(content, bgclass, timeout)
         bgclass = 'bg-primary';
     }
     
-    toast.find('#toast-body').html(content);    
+    // Treat content as plain text by default to avoid XSS via server /
+    // user-influenced strings. Callers passing icons must use showToastHtml.
+    toast.find('#toast-body').text(content);
     
     toast.addClass(bgclass).addClass('show');
     
