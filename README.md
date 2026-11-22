@@ -38,3 +38,16 @@ docker compose up -d
 ```sh
 php update.php
 ```
+
+## Tests
+
+An integration test suite (`tests/`) covers lib functions and every HTTP endpoint against a real MySQL instance, including the secrets burn/expiry lifecycle and the audit regression cases (decompression bombs, XXE, XSS round-trips, path traversal).
+
+Run it against the dev stack:
+
+```sh
+docker compose up -d
+docker compose exec tools php tests/run.php
+```
+
+It also runs in CI on every push and pull request.

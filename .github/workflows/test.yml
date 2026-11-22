@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare .env
+        run: |
+          printf 'APP_TITLE=CI\nAPP_BASE_URL=\nMYSQL_HOST=mysql\nMYSQL_USER=tools\nMYSQL_PASSWORD=tools\nMYSQL_DATABASE=tools\n' > .env
+
+      - name: Start stack
+        run: docker compose up -d --build
+
+      - name: Wait for MySQL
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T mysql mysqladmin ping -u tools -ptools --silent 2>/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL did not become ready" && exit 1
+
+      - name: Run migrations
+        run: docker compose exec -T tools php update.php
+
+      - name: Run test suite
+        run: docker compose exec -T tools php tests/run.php
