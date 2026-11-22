@@ -17,5 +17,5 @@
 <div id="snippet-left" class="d-none"><?= $activeSnippet ? htmlSafeSnippet($activeSnippet['snippetLeft']) : null ?></div>
 <div id="snippet-right" class="d-none"><?= $activeSnippet && !empty($activeSnippet['snippetRight']) ? htmlSafeSnippet($activeSnippet['snippetRight']) : null ?></div>
 <script>
-    const activeSnippetFormat = <?= $activeSnippet ? "'{$activeSnippet['format']}'" : 'null' ?>;    
+    const activeSnippetFormat = <?= json_encode($activeSnippet['format'] ?? null) ?>;
 </script>

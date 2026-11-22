@@ -7,9 +7,6 @@ require('tools/indent/xml.php');
 
 header('Content-Type: application/json');
 
-// Cap inflated output to guard against decompression bombs.
-const MAX_INFLATE_BYTES = 8 * 1024 * 1024; // 8 MB
-
 $base64 = trim($_POST['base64'] ?? '');
 
 if (!$base64) {
@@ -20,10 +17,10 @@ if (!$base64) {
 $hex = str_replace('0x', '', $base64);
 $binary = (ctype_xdigit($hex) && strlen($hex) % 2 === 0) ? hex2bin($hex) : false;
 
-$data = $binary !== false ? @gzinflate($binary, MAX_INFLATE_BYTES) : false;
+$data = $binary !== false ? @gzinflate($binary, MAX_DECOMPRESS_BYTES) : false;
 
 if (!$data) {
-    $data = @gzinflate(base64_decode($base64), MAX_INFLATE_BYTES);
+    $data = @gzinflate(base64_decode($base64), MAX_DECOMPRESS_BYTES);
 }
 
 if (!$data) {
