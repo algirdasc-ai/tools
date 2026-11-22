@@ -104,6 +104,102 @@ function htmlSafeSnippet(?string $snippet): string
     return (string) $snippet;
 }
 
+// ---------------------------------------------------------------------------
+// Secrets: server stores only ciphertext (E2E encrypted in the browser).
+// Secrets are deliberately fragile: they expire and burn after N reads.
+// ---------------------------------------------------------------------------
+
+function secretHash(string $ciphertext): string
+{
+    // Truncated SHA-256 (collision-resistant); 8 bytes keeps URLs short.
+    $hash = substr(hash('sha256', $ciphertext, true), 0, 8);
+
+    return rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+}
+
+function saveSecret(string $ciphertext, ?int $ttlSeconds, ?int $maxReads): ?array
+{
+    $hash = secretHash($ciphertext);
+
+    // Deduplicate: identical ciphertext yields the same hash.
+    if ($existing = fetchSecret($hash)) {
+        return $existing;
+    }
+
+    $expiresAt = $ttlSeconds !== null ? gmdate('Y-m-d H:i:s', time() + $ttlSeconds) : null;
+
+    // INSERT ... SELECT tricks mysqli into binding NULLs: NULLIF falls back to
+    // the column default for ttl=0/max_reads=0, which we never send anyway.
+    $stmt = mysql()->prepare('INSERT IGNORE INTO secrets (hash, ciphertext, expires_at, max_reads, reads, created_at) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, 0), 0, NULL)');
+    $stmt->bind_param('sssi', $hash, $ciphertext, $expiresAt ?? '', $maxReads ?? 0);
+    $stmt->execute();
+    $stmt->close();
+
+    return fetchSecret($hash);
+}
+
+function fetchSecret(string $hash): ?array
+{
+    $stmt = mysql()->prepare('SELECT hash, ciphertext, expires_at, max_reads, reads FROM secrets WHERE hash = ?');
+    $stmt->bind_param('s', $hash);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    return $result ?: null;
+}
+
+/**
+ * Atomically consumes one read and returns the ciphertext.
+ * Returns null when the secret is unknown, expired, or already burned.
+ * Expired/burned rows are deleted on touch (fragile by design).
+ */
+function consumeSecret(string $hash): ?string
+{
+    $db = mysql();
+
+    // Atomic burn: increments only while reads remain.
+    $stmt = $db->prepare('UPDATE secrets SET reads = reads + 1 WHERE hash = ? AND (max_reads IS NULL OR reads < max_reads)');
+    $stmt->bind_param('s', $hash);
+    $stmt->execute();
+    $consumed = $stmt->affected_rows === 1;
+    $stmt->close();
+
+    if (!$consumed) {
+        return null;
+    }
+
+    $secret = fetchSecret($hash);
+
+    if (!$secret || ($secret['expires_at'] !== null && strtotime($secret['expires_at'] . ' UTC') <= time())) {
+        deleteSecret($hash);
+        return null;
+    }
+
+    // Fully burned -> remove immediately.
+    if ($secret['max_reads'] !== null && (int) $secret['reads'] >= (int) $secret['max_reads']) {
+        deleteSecret($hash);
+    }
+
+    return $secret['ciphertext'];
+}
+
+function deleteSecret(string $hash): void
+{
+    $stmt = mysql()->prepare('DELETE FROM secrets WHERE hash = ?');
+    $stmt->bind_param('s', $hash);
+    $stmt->execute();
+    $stmt->close();
+}
+
+/**
+ * Opportunistic cleanup of expired secrets (no cron needed).
+ */
+function sweepExpiredSecrets(): void
+{
+    mysql()->query("DELETE FROM secrets WHERE expires_at IS NOT NULL AND expires_at < UTC_TIMESTAMP()");
+}
+
 function response(array $data): void
 {
     echo json_encode($data);

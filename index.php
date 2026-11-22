@@ -70,6 +70,11 @@ $activeSnippet = getSnippet($_GET['hash'] ?? '');
                         <i class="bi bi-hammer"></i>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="/s" class="nav-link <?= $activeTool === 'secrets' ? 'active' : null ?> py-3 border-bottom" data-bs-toggle="tooltip" data-bs-placement="right" title="Secrets">
+                        <i class="bi bi-shield-lock"></i>
+                    </a>
+                </li>
             </ul>
         </div>
         <div class="bg p-3">
