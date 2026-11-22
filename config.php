@@ -11,6 +11,7 @@ $tools = [
     'd' => 'diff',
     'h' => 'hashes',
     'm' => 'misc',
+    's' => 'secrets',
 ];
 
 $js = [

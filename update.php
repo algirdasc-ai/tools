@@ -10,6 +10,7 @@ require_once 'lib.php';
 
 $migrationFiles = [
     'snippets' => __DIR__ . '/sql/snippets.sql',
+    'secrets' => __DIR__ . '/sql/secrets.sql',
 ];
 
 $mysql = mysql();

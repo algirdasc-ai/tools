@@ -32,6 +32,8 @@ tools/
 ├── lib.php          # Core library functions
 ├── index.php        # Main entry point
 ├── share.php        # Snippet sharing endpoint
+├── secret_save.php  # Secret creation endpoint (ciphertext only)
+├── secret_read.php  # Secret read endpoint (burns on read)
 ├── autoformat.php   # Code formatting endpoint
 └── docker-compose.yaml
 ```
@@ -47,7 +49,16 @@ tools/
 ### 2. Diff (`/d`)
 - Side-by-side code comparison using CodeMirror MergeView
 
-### 3. Hashes (`/h`)
+### 3. Secrets (`/s`)
+- End-to-end encrypted secret sharing (AES-256-GCM via Web Crypto API)
+- Encryption/decryption happens entirely in the browser; the server stores only ciphertext (`iv || ciphertext || tag`, base64)
+- The decryption key travels only in the URL fragment (`/s/{hash}#key`), which browsers never send to the server
+- Secrets are fragile by design: default is **burn after 1 view** + **4-hour expiry** (configurable: 1/3/5/10 views, 1h/4h/24h/7d)
+- Reads are atomic (`UPDATE ... WHERE reads < max_reads`) to prevent race-condition over-reads; burned/expired rows are deleted immediately
+- Expired secrets are swept opportunistically on writes (no cron)
+- Endpoints: `secret_save.php` (POST ciphertext, ttl, max_reads), `secret_read.php` (POST hash — reading is a mutation, burns the secret)
+
+### 4. Hashes (`/h`)
 - Hash generation: MD5, SHA1, SHA256, SHA512, RIPEMD-160
 - Base64 encoding/decoding
 - gzinflate/gzuncompress decompression
