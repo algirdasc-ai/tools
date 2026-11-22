@@ -130,7 +130,7 @@ function saveSecret(string $ciphertext, ?int $ttlSeconds, ?int $maxReads): ?arra
 
     // INSERT ... SELECT tricks mysqli into binding NULLs: NULLIF falls back to
     // the column default for ttl=0/max_reads=0, which we never send anyway.
-    $stmt = mysql()->prepare('INSERT IGNORE INTO secrets (hash, ciphertext, expires_at, max_reads, reads, created_at) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, 0), 0, NULL)');
+    $stmt = mysql()->prepare('INSERT IGNORE INTO secrets (hash, ciphertext, expires_at, max_reads, `reads`, created_at) VALUES (?, ?, NULLIF(?, \'\'), NULLIF(?, 0), 0, NULL)');
     $stmt->bind_param('sssi', $hash, $ciphertext, $expiresAt ?? '', $maxReads ?? 0);
     $stmt->execute();
     $stmt->close();
@@ -140,7 +140,7 @@ function saveSecret(string $ciphertext, ?int $ttlSeconds, ?int $maxReads): ?arra
 
 function fetchSecret(string $hash): ?array
 {
-    $stmt = mysql()->prepare('SELECT hash, ciphertext, expires_at, max_reads, reads FROM secrets WHERE hash = ?');
+    $stmt = mysql()->prepare('SELECT hash, ciphertext, expires_at, max_reads, `reads` FROM secrets WHERE hash = ?');
     $stmt->bind_param('s', $hash);
     $stmt->execute();
     $result = $stmt->get_result()->fetch_assoc();
@@ -159,7 +159,7 @@ function consumeSecret(string $hash): ?string
     $db = mysql();
 
     // Atomic burn: increments only while reads remain.
-    $stmt = $db->prepare('UPDATE secrets SET reads = reads + 1 WHERE hash = ? AND (max_reads IS NULL OR reads < max_reads)');
+    $stmt = $db->prepare('UPDATE secrets SET `reads` = `reads` + 1 WHERE hash = ? AND (max_reads IS NULL OR `reads` < max_reads)');
     $stmt->bind_param('s', $hash);
     $stmt->execute();
     $consumed = $stmt->affected_rows === 1;
